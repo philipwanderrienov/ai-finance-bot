@@ -1,6 +1,6 @@
 using NewsCollector.Api.Models;
 
-namespace NewsCollector.Api.Services;
+namespace NewsCollector.Api.Services.NewsSignalService;
 
 public interface INewsSignalService
 {

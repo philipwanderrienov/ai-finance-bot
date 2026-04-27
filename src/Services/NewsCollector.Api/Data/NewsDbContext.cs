@@ -13,6 +13,7 @@ public sealed class NewsDbContext : DbContext
     public DbSet<NewsSourceEntity> NewsSources => Set<NewsSourceEntity>();
     public DbSet<NewsArticleEntity> NewsArticles => Set<NewsArticleEntity>();
     public DbSet<NewsSignalEntity> NewsSignals => Set<NewsSignalEntity>();
+    public DbSet<DeepSeekAnalysisEntity> DeepSeekAnalyses => Set<DeepSeekAnalysisEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -53,8 +54,8 @@ public sealed class NewsDbContext : DbContext
             entity.Property(x => x.IngestedAt).HasColumnName("ingested_at");
             entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
 
-            entity.HasIndex(x => x.Url).IsUnique();
-            entity.HasIndex(x => new { x.SourceName, x.SourceExternalId }).IsUnique();
+            entity.HasIndex(x => x.PublishedAt);
+            entity.HasIndex(x => new { x.SourceName, x.PublishedAt });
         });
 
         modelBuilder.Entity<NewsSignalEntity>(entity =>
@@ -71,6 +72,29 @@ public sealed class NewsDbContext : DbContext
             entity.Property(x => x.SuggestedPrice).HasColumnName("suggested_price");
             entity.Property(x => x.Reason).HasColumnName("reason").IsRequired();
             entity.Property(x => x.GeneratedAt).HasColumnName("generated_at");
+        });
+
+        modelBuilder.Entity<DeepSeekAnalysisEntity>(entity =>
+        {
+            entity.ToTable("deepseek_analyses");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id)
+                .HasColumnName("id")
+                .ValueGeneratedOnAdd();
+            entity.Property(x => x.Category).HasColumnName("category").HasColumnType("news_category");
+            entity.Property(x => x.Symbol).HasColumnName("symbol").IsRequired();
+            entity.Property(x => x.ModelName).HasColumnName("model_name").IsRequired();
+            entity.Property(x => x.Summary).HasColumnName("summary").IsRequired();
+            entity.Property(x => x.Confidence).HasColumnName("confidence");
+            entity.Property(x => x.Verdict).HasColumnName("verdict").IsRequired();
+            entity.Property(x => x.Reason).HasColumnName("reason").IsRequired();
+            entity.Property(x => x.KeyPoints).HasColumnName("key_points");
+            entity.Property(x => x.RiskFactors).HasColumnName("risk_factors");
+            entity.Property(x => x.SourceUrls).HasColumnName("source_urls");
+            entity.Property(x => x.GeneratedAt).HasColumnName("generated_at");
+            entity.Property(x => x.Prompt).HasColumnName("prompt");
+            entity.Property(x => x.RawResponse).HasColumnName("raw_response");
+            entity.HasIndex(x => new { x.Category, x.Symbol, x.GeneratedAt });
         });
 
         base.OnModelCreating(modelBuilder);

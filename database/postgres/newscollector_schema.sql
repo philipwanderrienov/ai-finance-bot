@@ -44,9 +44,7 @@ CREATE TABLE IF NOT EXISTS news_articles (
     keywords            TEXT[] NULL,
     raw_payload         JSONB NULL,
     ingested_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_news_articles_source_external_id UNIQUE (source_name, source_external_id),
-    CONSTRAINT uq_news_articles_url UNIQUE (url)
+    updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS ix_news_articles_published_at

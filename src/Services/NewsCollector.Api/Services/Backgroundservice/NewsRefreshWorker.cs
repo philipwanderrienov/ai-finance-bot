@@ -1,5 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using NewsCollector.Api.Models;
+using NewsCollector.Api.Repository.PolymarketNewsRepository;
+using NewsCollector.Api.Services.NewsSignalService;
 
 namespace NewsCollector.Api.Services;
 
@@ -7,20 +10,29 @@ public sealed class NewsRefreshWorker : BackgroundService
 {
     private readonly ILogger<NewsRefreshWorker> _logger;
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly NewsRefreshSchedulerOptions _schedulerOptions;
 
     public NewsRefreshWorker(
         ILogger<NewsRefreshWorker> logger,
-        IServiceScopeFactory scopeFactory)
+        IServiceScopeFactory scopeFactory,
+        IOptions<NewsRefreshSchedulerOptions> schedulerOptions)
     {
         _logger = logger;
         _scopeFactory = scopeFactory;
+        _schedulerOptions = schedulerOptions.Value;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (_schedulerOptions.InitialDelaySeconds > 0)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(_schedulerOptions.InitialDelaySeconds), stoppingToken);
+        }
+
         await ProcessBatchAsync(stoppingToken);
 
-        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
+        var interval = TimeSpan.FromMinutes(Math.Max(1, _schedulerOptions.IntervalMinutes));
+        using var timer = new PeriodicTimer(interval);
 
         while (await timer.WaitForNextTickAsync(stoppingToken))
         {
