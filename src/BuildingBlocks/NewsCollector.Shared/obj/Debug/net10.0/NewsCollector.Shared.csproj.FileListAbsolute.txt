@@ -1,0 +1,11 @@
+/Users/philipwanderrienov/Documents/tesDuluAI/src/BuildingBlocks/NewsCollector.Shared/bin/Debug/net10.0/NewsCollector.Shared.deps.json
+/Users/philipwanderrienov/Documents/tesDuluAI/src/BuildingBlocks/NewsCollector.Shared/bin/Debug/net10.0/NewsCollector.Shared.dll
+/Users/philipwanderrienov/Documents/tesDuluAI/src/BuildingBlocks/NewsCollector.Shared/bin/Debug/net10.0/NewsCollector.Shared.pdb
+/Users/philipwanderrienov/Documents/tesDuluAI/src/BuildingBlocks/NewsCollector.Shared/obj/Debug/net10.0/NewsCollector.Shared.GeneratedMSBuildEditorConfig.editorconfig
+/Users/philipwanderrienov/Documents/tesDuluAI/src/BuildingBlocks/NewsCollector.Shared/obj/Debug/net10.0/NewsCollector.Shared.AssemblyInfoInputs.cache
+/Users/philipwanderrienov/Documents/tesDuluAI/src/BuildingBlocks/NewsCollector.Shared/obj/Debug/net10.0/NewsCollector.Shared.AssemblyInfo.cs
+/Users/philipwanderrienov/Documents/tesDuluAI/src/BuildingBlocks/NewsCollector.Shared/obj/Debug/net10.0/NewsCollector.Shared.csproj.CoreCompileInputs.cache
+/Users/philipwanderrienov/Documents/tesDuluAI/src/BuildingBlocks/NewsCollector.Shared/obj/Debug/net10.0/NewsCollector.Shared.dll
+/Users/philipwanderrienov/Documents/tesDuluAI/src/BuildingBlocks/NewsCollector.Shared/obj/Debug/net10.0/refint/NewsCollector.Shared.dll
+/Users/philipwanderrienov/Documents/tesDuluAI/src/BuildingBlocks/NewsCollector.Shared/obj/Debug/net10.0/NewsCollector.Shared.pdb
+/Users/philipwanderrienov/Documents/tesDuluAI/src/BuildingBlocks/NewsCollector.Shared/obj/Debug/net10.0/ref/NewsCollector.Shared.dll
