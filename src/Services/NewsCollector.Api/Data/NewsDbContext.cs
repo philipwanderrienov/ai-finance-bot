@@ -94,7 +94,10 @@ public sealed class NewsDbContext : DbContext
             entity.Property(x => x.GeneratedAt).HasColumnName("generated_at");
             entity.Property(x => x.Prompt).HasColumnName("prompt");
             entity.Property(x => x.RawResponse).HasColumnName("raw_response");
+            entity.Property(x => x.InputFingerprint).HasColumnName("input_fingerprint").IsRequired();
+            entity.Property(x => x.InputArticleCount).HasColumnName("input_article_count");
             entity.HasIndex(x => new { x.Category, x.Symbol, x.GeneratedAt });
+            entity.HasIndex(x => new { x.Category, x.Symbol, x.InputFingerprint }).IsUnique();
         });
 
         base.OnModelCreating(modelBuilder);

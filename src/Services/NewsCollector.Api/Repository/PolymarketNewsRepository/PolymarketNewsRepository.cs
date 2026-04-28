@@ -38,8 +38,37 @@ public sealed class PolymarketNewsRepository : IPolymarketNewsRepository
             .AsNoTracking()
             .SingleAsync(x => x.Name == SourceName, cancellationToken);
 
+        var recentArticles = await _dbContext.NewsArticles
+            .AsNoTracking()
+            .Where(x => x.SourceName == SourceName)
+            .OrderByDescending(x => x.PublishedAt)
+            .Take(500)
+            .Select(x => new { x.Url, x.Title, x.Summary })
+            .ToListAsync(cancellationToken);
+
+        var existingUrls = new HashSet<string>(
+            recentArticles.Select(x => x.Url).Where(x => !string.IsNullOrWhiteSpace(x)),
+            StringComparer.OrdinalIgnoreCase);
+
+        var existingSignatures = new HashSet<string>(
+            recentArticles.Select(x => BuildSignature(x.Title, x.Summary)),
+            StringComparer.OrdinalIgnoreCase);
+
+        var inserted = 0;
+
         foreach (var item in polymarketItems)
         {
+            if (!string.IsNullOrWhiteSpace(item.Url) && existingUrls.Contains(item.Url))
+            {
+                continue;
+            }
+
+            var signature = BuildSignature(item.Title, item.Summary);
+            if (existingSignatures.Contains(signature))
+            {
+                continue;
+            }
+
             _dbContext.NewsArticles.Add(new NewsArticleEntity
             {
                 Id = Guid.NewGuid(),
@@ -57,6 +86,19 @@ public sealed class PolymarketNewsRepository : IPolymarketNewsRepository
                 IngestedAt = DateTimeOffset.UtcNow,
                 UpdatedAt = DateTimeOffset.UtcNow
             });
+
+            if (!string.IsNullOrWhiteSpace(item.Url))
+            {
+                existingUrls.Add(item.Url);
+            }
+
+            existingSignatures.Add(signature);
+            inserted++;
+        }
+
+        if (inserted == 0)
+        {
+            return 0;
         }
 
         return await _dbContext.SaveChangesAsync(cancellationToken);
@@ -78,6 +120,17 @@ public sealed class PolymarketNewsRepository : IPolymarketNewsRepository
         });
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static string BuildSignature(string title, string summary)
+    {
+        static string Normalize(string value)
+            => new string((value ?? string.Empty)
+                .ToLowerInvariant()
+                .Where(char.IsLetterOrDigit)
+                .ToArray());
+
+        return $"{Normalize(title)}|{Normalize(summary)}";
     }
 
     private static IConfigurationRoot BuildConfiguration()

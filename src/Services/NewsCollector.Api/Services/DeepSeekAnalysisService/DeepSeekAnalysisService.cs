@@ -10,7 +10,7 @@ namespace NewsCollector.Api.Services.DeepSeekAnalysisService;
 
 public sealed class DeepSeekAnalysisService : IDeepSeekAnalysisService
 {
-    private const string DefaultModelName = "deepseek-chat";
+    private const string DefaultModelName = "deepseek-reasoner";
     private static readonly HttpClient HttpClient = new();
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -19,28 +19,44 @@ public sealed class DeepSeekAnalysisService : IDeepSeekAnalysisService
 
     private readonly NewsDbContext _dbContext;
     private readonly DeepSeekOptions _options;
+    private readonly IAnalysisCandidateBuilder _candidateBuilder;
+    private readonly IAnalysisFingerprintService _fingerprintService;
 
-    public DeepSeekAnalysisService(NewsDbContext dbContext, IOptions<DeepSeekOptions> options)
+    public DeepSeekAnalysisService(
+        NewsDbContext dbContext,
+        IOptions<DeepSeekOptions> options,
+        IAnalysisCandidateBuilder candidateBuilder,
+        IAnalysisFingerprintService fingerprintService)
     {
         _dbContext = dbContext;
         _options = options.Value;
+        _candidateBuilder = candidateBuilder;
+        _fingerprintService = fingerprintService;
     }
 
     public async Task<DeepSeekAnalysisResult> AnalyzeAsync(DeepSeekAnalysisRequest request, CancellationToken cancellationToken)
     {
-        var articles = await _dbContext.NewsArticles
-            .AsNoTracking()
-            .Where(x => x.Category == request.Category && x.SourceName == "Polymarket")
-            .OrderByDescending(x => x.PublishedAt)
-            .Take(Math.Clamp(request.LookbackCount, 1, 50))
-            .ToListAsync(cancellationToken);
+        var candidates = await _candidateBuilder.BuildAsync(request, cancellationToken);
 
-        if (articles.Count == 0)
+        if (candidates.Count == 0)
         {
-            throw new InvalidOperationException($"No Polymarket articles found for category {request.Category}.");
+            throw new InvalidOperationException($"No articles found for category {request.Category}.");
         }
 
-        var prompt = BuildPrompt(request, articles);
+        var fingerprint = _fingerprintService.CreateFingerprint(request.Category, request.Symbol, candidates);
+
+        var existing = await _dbContext.DeepSeekAnalyses
+            .AsNoTracking()
+            .Where(x => x.Category == request.Category && x.Symbol == request.Symbol && x.InputFingerprint == fingerprint)
+            .OrderByDescending(x => x.GeneratedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (existing is not null)
+        {
+            return Map(existing);
+        }
+
+        var prompt = BuildPrompt(request, candidates);
         var analysis = await RequestDeepSeekAsync(prompt, cancellationToken);
 
         var entity = new DeepSeekAnalysisEntity
@@ -55,10 +71,12 @@ public sealed class DeepSeekAnalysisService : IDeepSeekAnalysisService
             Reason = analysis.Reason,
             KeyPoints = analysis.KeyPoints.ToList(),
             RiskFactors = analysis.RiskFactors.ToList(),
-            SourceUrls = articles.Select(x => x.Url).Distinct().ToList(),
+            SourceUrls = candidates.Select(x => x.Url).Distinct().ToList(),
             GeneratedAt = DateTimeOffset.UtcNow,
             Prompt = prompt,
-            RawResponse = analysis.RawResponse
+            RawResponse = analysis.RawResponse,
+            InputFingerprint = fingerprint,
+            InputArticleCount = candidates.Count
         };
 
         _dbContext.DeepSeekAnalyses.Add(entity);
@@ -213,24 +231,24 @@ public sealed class DeepSeekAnalysisService : IDeepSeekAnalysisService
             .ToArray();
     }
 
-    private string BuildPrompt(DeepSeekAnalysisRequest request, IReadOnlyList<NewsArticleEntity> articles)
+    private string BuildPrompt(DeepSeekAnalysisRequest request, IReadOnlyList<AnalysisCandidate> candidates)
     {
         var builder = new StringBuilder();
-        builder.AppendLine($"Analyze Polymarket news for {request.Category} ({request.Symbol}).");
+        builder.AppendLine($"Analyze news for {request.Category} ({request.Symbol}).");
         builder.AppendLine("Return valid JSON with keys: summary, confidence, verdict, reason, keyPoints, riskFactors.");
         builder.AppendLine("Use only the provided news items as context.");
         builder.AppendLine();
 
-        foreach (var article in articles)
+        foreach (var candidate in candidates)
         {
-            builder.AppendLine($"- {article.PublishedAt:O} | {article.Title} | {article.Summary} | {article.Url}");
+            builder.AppendLine($"- {candidate.PublishedAt:O} | {candidate.SourceName} | {candidate.Title} | {candidate.Summary} | {candidate.Url}");
         }
 
         return builder.ToString();
     }
 
     private string ResolveModelName()
-        => string.IsNullOrWhiteSpace(_options.BaseUrl) ? DefaultModelName : DefaultModelName;
+        => DefaultModelName;
 
     private static DeepSeekAnalysisResult Map(DeepSeekAnalysisEntity entity)
         => new(

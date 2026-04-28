@@ -35,4 +35,6 @@ public sealed class DeepSeekAnalysisEntity
     public DateTimeOffset GeneratedAt { get; set; }
     public string? Prompt { get; set; }
     public string? RawResponse { get; set; }
+    public string InputFingerprint { get; set; } = string.Empty;
+    public int InputArticleCount { get; set; }
 }
