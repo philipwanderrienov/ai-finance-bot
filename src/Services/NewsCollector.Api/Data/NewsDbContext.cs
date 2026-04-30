@@ -1,4 +1,6 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using NewsCollector.Api.Models;
 
 namespace NewsCollector.Api.Data;
@@ -49,7 +51,14 @@ public sealed class NewsDbContext : DbContext
             entity.Property(x => x.PublishedAt).HasColumnName("published_at");
             entity.Property(x => x.Category).HasColumnName("category").HasColumnType("news_category");
             entity.Property(x => x.SentimentScore).HasColumnName("sentiment_score");
-            entity.Property(x => x.Keywords).HasColumnName("keywords");
+            entity.Property(x => x.Keywords)
+                .HasColumnName("keywords")
+                .HasConversion(
+                    value => JsonSerializer.Serialize(value, (JsonSerializerOptions?)null),
+                    value => string.IsNullOrWhiteSpace(value)
+                        ? new List<string>()
+                        : JsonSerializer.Deserialize<List<string>>(value, (JsonSerializerOptions?)null) ?? new List<string>())
+                .Metadata.SetValueComparer(StringListComparer);
             entity.Property(x => x.RawPayload).HasColumnName("raw_payload").HasColumnType("jsonb");
             entity.Property(x => x.IngestedAt).HasColumnName("ingested_at");
             entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
@@ -88,9 +97,25 @@ public sealed class NewsDbContext : DbContext
             entity.Property(x => x.Confidence).HasColumnName("confidence");
             entity.Property(x => x.Verdict).HasColumnName("verdict").IsRequired();
             entity.Property(x => x.Reason).HasColumnName("reason").IsRequired();
-            entity.Property(x => x.KeyPoints).HasColumnName("key_points");
-            entity.Property(x => x.RiskFactors).HasColumnName("risk_factors");
-            entity.Property(x => x.SourceUrls).HasColumnName("source_urls");
+            entity.Property(x => x.KeyPoints)
+                .HasColumnName("key_points")
+                .HasConversion(
+                    value => SerializeStringList(value),
+                    value => DeserializeStringList(value))
+                .Metadata.SetValueComparer(StringListComparer);
+            entity.Property(x => x.RiskFactors)
+                .HasColumnName("risk_factors")
+                .HasConversion(
+                    value => SerializeStringList(value),
+                    value => DeserializeStringList(value))
+                .Metadata.SetValueComparer(StringListComparer);
+            entity.Property(x => x.SourceUrls)
+                .HasColumnName("source_urls")
+                .HasColumnType("jsonb")
+                .HasConversion(
+                    value => SerializeStringList(value),
+                    value => DeserializeStringList(value))
+                .Metadata.SetValueComparer(StringListComparer);
             entity.Property(x => x.GeneratedAt).HasColumnName("generated_at");
             entity.Property(x => x.Prompt).HasColumnName("prompt");
             entity.Property(x => x.RawResponse).HasColumnName("raw_response");
@@ -102,6 +127,21 @@ public sealed class NewsDbContext : DbContext
 
         base.OnModelCreating(modelBuilder);
     }
+
+    private static string SerializeStringList(IReadOnlyCollection<string>? value)
+        => JsonSerializer.Serialize(value ?? Array.Empty<string>());
+
+    private static List<string> DeserializeStringList(string? value)
+        => string.IsNullOrWhiteSpace(value)
+            ? new List<string>()
+            : JsonSerializer.Deserialize<List<string>>(value) ?? new List<string>();
+
+    private static readonly ValueComparer<List<string>> StringListComparer = new(
+        (left, right) => left != null && right != null && left.SequenceEqual(right),
+        value => value == null
+            ? 0
+            : value.Aggregate(0, (hash, item) => HashCode.Combine(hash, item.GetHashCode(StringComparison.Ordinal))),
+        value => value == null ? new List<string>() : value.ToList());
 }
 
 public sealed class NewsSourceEntity

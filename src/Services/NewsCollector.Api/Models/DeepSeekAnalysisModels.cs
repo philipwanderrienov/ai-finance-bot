@@ -3,7 +3,8 @@ namespace NewsCollector.Api.Models;
 public sealed record DeepSeekAnalysisRequest(
     NewsCategory Category,
     string Symbol,
-    int LookbackCount = 25);
+    int LookbackCount = 25,
+    decimal? MarketPrice = null);
 
 public sealed record DeepSeekAnalysisResult(
     Guid Id,
@@ -14,6 +15,10 @@ public sealed record DeepSeekAnalysisResult(
     decimal Confidence,
     string Verdict,
     string Reason,
+    decimal AiProbability,
+    decimal MarketPrice,
+    decimal Gap,
+    string Signal,
     IReadOnlyCollection<string> KeyPoints,
     IReadOnlyCollection<string> RiskFactors,
     IReadOnlyCollection<string> SourceUrls,

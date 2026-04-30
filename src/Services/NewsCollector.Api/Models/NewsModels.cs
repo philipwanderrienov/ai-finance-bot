@@ -1,5 +1,8 @@
+using System.Text.Json.Serialization;
+
 namespace NewsCollector.Api.Models;
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum NewsCategory
 {
     Geopolitics = 0,

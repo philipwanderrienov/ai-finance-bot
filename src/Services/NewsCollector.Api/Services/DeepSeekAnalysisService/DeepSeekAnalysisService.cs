@@ -43,46 +43,30 @@ public sealed class DeepSeekAnalysisService : IDeepSeekAnalysisService
             throw new InvalidOperationException($"No articles found for category {request.Category}.");
         }
 
-        var fingerprint = _fingerprintService.CreateFingerprint(request.Category, request.Symbol, candidates);
-
-        var existing = await _dbContext.DeepSeekAnalyses
-            .AsNoTracking()
-            .Where(x => x.Category == request.Category && x.Symbol == request.Symbol && x.InputFingerprint == fingerprint)
-            .OrderByDescending(x => x.GeneratedAt)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (existing is not null)
-        {
-            return Map(existing);
-        }
-
         var prompt = BuildPrompt(request, candidates);
-        var analysis = await RequestDeepSeekAsync(prompt, cancellationToken);
+        var analysis = await RequestDeepSeekAsync(request, candidates, prompt, cancellationToken);
 
-        var entity = new DeepSeekAnalysisEntity
-        {
-            Id = Guid.NewGuid(),
-            Category = request.Category,
-            Symbol = request.Symbol,
-            ModelName = ResolveModelName(),
-            Summary = analysis.Summary,
-            Confidence = analysis.Confidence,
-            Verdict = analysis.Verdict,
-            Reason = analysis.Reason,
-            KeyPoints = analysis.KeyPoints.ToList(),
-            RiskFactors = analysis.RiskFactors.ToList(),
-            SourceUrls = candidates.Select(x => x.Url).Distinct().ToList(),
-            GeneratedAt = DateTimeOffset.UtcNow,
-            Prompt = prompt,
-            RawResponse = analysis.RawResponse,
-            InputFingerprint = fingerprint,
-            InputArticleCount = candidates.Count
-        };
+        var marketPrice = NormalizeMarketPrice(request.MarketPrice ?? InferMarketPrice(request.Category));
+        var gap = Math.Round(analysis.Confidence - marketPrice, 4, MidpointRounding.AwayFromZero);
+        var signal = ResolveDivergenceSignal(analysis.Confidence, marketPrice);
 
-        _dbContext.DeepSeekAnalyses.Add(entity);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        return Map(entity);
+        return new DeepSeekAnalysisResult(
+            Guid.NewGuid(),
+            request.Category,
+            request.Symbol,
+            ResolveModelName(),
+            analysis.Summary,
+            analysis.Confidence,
+            analysis.Verdict,
+            analysis.Reason,
+            analysis.Confidence,
+            marketPrice,
+            gap,
+            signal,
+            analysis.KeyPoints.ToArray(),
+            analysis.RiskFactors.ToArray(),
+            candidates.Select(x => x.Url).Where(url => !string.IsNullOrWhiteSpace(url)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+            DateTimeOffset.UtcNow);
     }
 
     public async Task<IReadOnlyList<DeepSeekAnalysisResult>> GetLatestAsync(NewsCategory category, string symbol, int take, CancellationToken cancellationToken)
@@ -99,11 +83,15 @@ public sealed class DeepSeekAnalysisService : IDeepSeekAnalysisService
         return results.Select(Map).ToArray();
     }
 
-    private async Task<DeepSeekAnalysisPayload> RequestDeepSeekAsync(string prompt, CancellationToken cancellationToken)
+    private async Task<DeepSeekAnalysisPayload> RequestDeepSeekAsync(
+        DeepSeekAnalysisRequest request,
+        IReadOnlyList<AnalysisCandidate> candidates,
+        string prompt,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(_options.ApiKey))
         {
-            return BuildOfflinePayload(prompt);
+            return BuildSimulatorPayload(request, candidates, prompt);
         }
 
         var baseUrl = string.IsNullOrWhiteSpace(_options.BaseUrl) ? "https://api.deepseek.com" : _options.BaseUrl.TrimEnd('/');
@@ -118,11 +106,11 @@ public sealed class DeepSeekAnalysisService : IDeepSeekAnalysisService
             temperature = 0.2
         };
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/chat/completions");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
-        request.Content = new StringContent(JsonSerializer.Serialize(requestBody, JsonOptions), Encoding.UTF8, "application/json");
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/chat/completions");
+        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
+        requestMessage.Content = new StringContent(JsonSerializer.Serialize(requestBody, JsonOptions), Encoding.UTF8, "application/json");
 
-        using var response = await HttpClient.SendAsync(request, cancellationToken);
+        using var response = await HttpClient.SendAsync(requestMessage, cancellationToken);
         var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
         response.EnsureSuccessStatusCode();
 
@@ -136,16 +124,87 @@ public sealed class DeepSeekAnalysisService : IDeepSeekAnalysisService
         return payload with { RawResponse = responseText };
     }
 
-    private static DeepSeekAnalysisPayload BuildOfflinePayload(string prompt)
+    private static DeepSeekAnalysisPayload BuildSimulatorPayload(
+        DeepSeekAnalysisRequest request,
+        IReadOnlyList<AnalysisCandidate> candidates,
+        string prompt)
     {
-        return new DeepSeekAnalysisPayload(
-            Summary: "DeepSeek API key is missing, so this analysis was generated from local rules.",
-            Confidence: 0.55m,
-            Verdict: "neutral",
-            Reason: "Offline fallback because DeepSeek API key is not configured.",
-            KeyPoints: new[] { prompt.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "No prompt available" },
-            RiskFactors: new[] { "DeepSeek API key not configured" },
-            RawResponse: null);
+        var topCandidates = candidates
+            .OrderByDescending(candidate => candidate.SentimentScore ?? 0.5m)
+            .ThenByDescending(candidate => candidate.PublishedAt)
+            .Take(5)
+            .ToArray();
+
+        var averageSentiment = topCandidates.Length == 0
+            ? 0.5m
+            : topCandidates.Average(candidate => candidate.SentimentScore ?? 0.5m);
+
+        var positiveSignals = topCandidates.Count(candidate =>
+            ContainsAny($"{candidate.Title} {candidate.Summary}", "approve", "surge", "bull", "win", "growth", "strong", "rally"));
+
+        var negativeSignals = topCandidates.Count(candidate =>
+            ContainsAny($"{candidate.Title} {candidate.Summary}", "risk", "drop", "ban", "delay", "fear", "decline", "lawsuit"));
+
+        var momentum = topCandidates.Length == 0 ? 0m : (positiveSignals - negativeSignals) / (decimal)topCandidates.Length;
+        var confidence = Math.Clamp(0.50m + ((averageSentiment - 0.5m) * 0.85m) + (momentum * 0.18m), 0.15m, 0.98m);
+
+        var verdict = confidence switch
+        {
+            >= 0.68m => "bullish",
+            <= 0.42m => "bearish",
+            _ => averageSentiment >= 0.52m ? "bullish" : averageSentiment <= 0.48m ? "bearish" : "neutral"
+        };
+
+        var summaryTone = verdict switch
+        {
+            "bullish" => "constructive",
+            "bearish" => "cautious",
+            _ => "balanced"
+        };
+
+        var summary = $"DeepSeek simulator produced a {summaryTone} read on {request.Category} ({request.Symbol}) from {candidates.Count} Polymarket articles.";
+        var reason = $"Offline simulator used because DeepSeek API key is not configured. Average sentiment={averageSentiment:0.00}, positiveSignals={positiveSignals}, negativeSignals={negativeSignals}, momentum={momentum:0.00}.";
+        var keyPoints = topCandidates
+            .Select(candidate => $"{candidate.PublishedAt:yyyy-MM-dd}: {candidate.Title}")
+            .Distinct()
+            .Take(5)
+            .ToArray();
+
+        if (keyPoints.Length == 0)
+        {
+            keyPoints = new[]
+            {
+                prompt.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "No prompt available"
+            };
+        }
+
+        var riskFactors = BuildRiskFactors(request, candidates, averageSentiment, negativeSignals);
+        return new DeepSeekAnalysisPayload(summary, confidence, verdict, reason, keyPoints, riskFactors, null);
+    }
+
+    private static IReadOnlyCollection<string> BuildRiskFactors(
+        DeepSeekAnalysisRequest request,
+        IReadOnlyList<AnalysisCandidate> candidates,
+        decimal averageSentiment,
+        int negativeSignals)
+    {
+        var riskFactors = new List<string>
+        {
+            $"No DeepSeek API key configured; using simulator for {request.Category}/{request.Symbol}.",
+            $"Average sentiment score is {averageSentiment:0.00}."
+        };
+
+        if (negativeSignals > 0)
+        {
+            riskFactors.Add($"{negativeSignals} negative-signal articles detected in the top sample.");
+        }
+
+        if (candidates.Count < request.LookbackCount)
+        {
+            riskFactors.Add($"Only {candidates.Count} candidates available from requested lookback {request.LookbackCount}.");
+        }
+
+        return riskFactors;
     }
 
     private static string ExtractAssistantContent(string responseText)
@@ -233,10 +292,14 @@ public sealed class DeepSeekAnalysisService : IDeepSeekAnalysisService
 
     private string BuildPrompt(DeepSeekAnalysisRequest request, IReadOnlyList<AnalysisCandidate> candidates)
     {
+        var marketPrice = NormalizeMarketPrice(request.MarketPrice ?? InferMarketPrice(request.Category));
         var builder = new StringBuilder();
         builder.AppendLine($"Analyze news for {request.Category} ({request.Symbol}).");
+        builder.AppendLine($"Polymarket price reference: {marketPrice:0.00}.");
         builder.AppendLine("Return valid JSON with keys: summary, confidence, verdict, reason, keyPoints, riskFactors.");
         builder.AppendLine("Use only the provided news items as context.");
+        builder.AppendLine("Confidence should represent the AI-calculated probability of the event happening.");
+        builder.AppendLine("Signal should be based on divergence between AI confidence and market price.");
         builder.AppendLine();
 
         foreach (var candidate in candidates)
@@ -250,8 +313,57 @@ public sealed class DeepSeekAnalysisService : IDeepSeekAnalysisService
     private string ResolveModelName()
         => DefaultModelName;
 
+    private static bool ContainsAny(string text, params string[] tokens)
+        => tokens.Any(token => text.Contains(token, StringComparison.OrdinalIgnoreCase));
+
+    private static decimal NormalizeMarketPrice(decimal price)
+        => Math.Clamp(price, 0.01m, 0.99m);
+
+    private static decimal InferMarketPrice(NewsCategory category)
+        => category switch
+        {
+            NewsCategory.Geopolitics => 0.55m,
+            NewsCategory.Gold => 0.52m,
+            NewsCategory.Crypto => 0.50m,
+            NewsCategory.Viral => 0.45m,
+            NewsCategory.Market => 0.50m,
+            _ => 0.50m
+        };
+
+    private static string ResolveDivergenceSignal(decimal aiProbability, decimal marketPrice)
+    {
+        var gap = aiProbability - marketPrice;
+
+        if (gap >= 0.15m)
+        {
+            return "LONG";
+        }
+
+        if (gap <= -0.15m)
+        {
+            return "SHORT";
+        }
+
+        if (gap >= 0.05m)
+        {
+            return "WATCH_LONG";
+        }
+
+        if (gap <= -0.05m)
+        {
+            return "WATCH_SHORT";
+        }
+
+        return "HOLD";
+    }
+
     private static DeepSeekAnalysisResult Map(DeepSeekAnalysisEntity entity)
-        => new(
+    {
+        var marketPrice = NormalizeMarketPrice(entity.Confidence);
+        var gap = Math.Round(entity.Confidence - marketPrice, 4, MidpointRounding.AwayFromZero);
+        var signal = ResolveDivergenceSignal(entity.Confidence, marketPrice);
+
+        return new DeepSeekAnalysisResult(
             entity.Id,
             entity.Category,
             entity.Symbol,
@@ -260,10 +372,15 @@ public sealed class DeepSeekAnalysisService : IDeepSeekAnalysisService
             entity.Confidence,
             entity.Verdict,
             entity.Reason,
+            entity.Confidence,
+            marketPrice,
+            gap,
+            signal,
             entity.KeyPoints,
             entity.RiskFactors,
             entity.SourceUrls,
             entity.GeneratedAt);
+    }
 
     private sealed record DeepSeekAnalysisPayload(
         string Summary,
