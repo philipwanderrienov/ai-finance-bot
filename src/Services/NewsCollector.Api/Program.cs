@@ -2,11 +2,17 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using Npgsql.NameTranslation;
 using NewsCollector.Api.Data;
 using NewsCollector.Api.Models;
 using NewsCollector.Api.Repository.PolymarketNewsRepository;
 using NewsCollector.Api.Services;
 using NewsCollector.Api.Services.DeepSeekAnalysisService;
+using NewsCollector.Api.Services.DeepSeekAnalysisService.Backtesting;
+using NewsCollector.Api.Services.DeepSeekAnalysisService.Explainability;
+using NewsCollector.Api.Services.DeepSeekAnalysisService.RegimeAwareness;
+using NewsCollector.Api.Services.DeepSeekAnalysisService.RiskManagement;
+using NewsCollector.Api.Services.DeepSeekAnalysisService.SourceWeighting;
 using NewsCollector.Api.Services.NewsSignalService;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -28,19 +34,21 @@ var connectionString = builder.Configuration.GetConnectionString("Postgres")
     ?? throw new InvalidOperationException("ConnectionStrings:Postgres is missing.");
 
 var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
-dataSourceBuilder.MapEnum<NewsCategory>("news_category");
-dataSourceBuilder.MapEnum<SignalAction>("signal_action");
+dataSourceBuilder.MapEnum<NewsCategory>("news_category", nameTranslator: new NpgsqlNullNameTranslator());
+dataSourceBuilder.MapEnum<SignalAction>("signal_action", nameTranslator: new NpgsqlNullNameTranslator());
 dataSourceBuilder.EnableUnmappedTypes();
 dataSourceBuilder.EnableDynamicJson();
 var dataSource = dataSourceBuilder.Build();
 
 builder.Services.AddSingleton(dataSource);
 builder.Services.AddDbContext<NewsDbContext>(options =>
-    options.UseNpgsql(dataSource, npgsqlOptions =>
-    {
-        npgsqlOptions.MapEnum<NewsCategory>("news_category");
-        npgsqlOptions.MapEnum<SignalAction>("signal_action");
-    }));
+    options.ConfigureWarnings(warnings =>
+        warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.CoreEventId.ManyServiceProvidersCreatedWarning))
+        .UseNpgsql(dataSource, npgsqlOptions =>
+        {
+            npgsqlOptions.MapEnum<NewsCategory>("news_category", nameTranslator: new NpgsqlNullNameTranslator());
+            npgsqlOptions.MapEnum<SignalAction>("signal_action", nameTranslator: new NpgsqlNullNameTranslator());
+        }));
 
 builder.Services.AddSingleton<INewsCatalog, InMemoryNewsCatalog>();
 builder.Services.AddSingleton<INewsSignalService, NewsSignalService>();
@@ -48,6 +56,12 @@ builder.Services.AddScoped<IPolymarketNewsRepository, PolymarketNewsRepository>(
 builder.Services.AddScoped<IAnalysisCandidateBuilder, AnalysisCandidateBuilder>();
 builder.Services.AddSingleton<IAnalysisFingerprintService, AnalysisFingerprintService>();
 builder.Services.AddScoped<IDeepSeekAnalysisService, DeepSeekAnalysisService>();
+builder.Services.AddScoped<IDeepSeekRegimeAwarenessService, DeepSeekRegimeAwarenessService>();
+builder.Services.AddScoped<IDeepSeekSourceWeightingService, DeepSeekSourceWeightingService>();
+builder.Services.AddScoped<IDeepSeekBacktestingService, DeepSeekBacktestingService>();
+builder.Services.AddScoped<IDeepSeekRiskManagementService, DeepSeekRiskManagementService>();
+builder.Services.AddScoped<IDeepSeekExplainabilityService, DeepSeekExplainabilityService>();
+builder.Services.AddScoped<IDeepSeekAnalysisMaturityService, DeepSeekAnalysisMaturityService>();
 builder.Services.AddHostedService<NewsRefreshWorker>();
 
 var app = builder.Build();

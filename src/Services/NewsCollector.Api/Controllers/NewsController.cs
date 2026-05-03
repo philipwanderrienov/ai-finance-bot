@@ -13,12 +13,18 @@ public sealed class NewsController : ControllerBase
     private readonly INewsCatalog _catalog;
     private readonly INewsSignalService _signalService;
     private readonly IDeepSeekAnalysisService _deepSeekAnalysisService;
+    private readonly IDeepSeekAnalysisMaturityService _deepSeekAnalysisMaturityService;
 
-    public NewsController(INewsCatalog catalog, INewsSignalService signalService, IDeepSeekAnalysisService deepSeekAnalysisService)
+    public NewsController(
+        INewsCatalog catalog,
+        INewsSignalService signalService,
+        IDeepSeekAnalysisService deepSeekAnalysisService,
+        IDeepSeekAnalysisMaturityService deepSeekAnalysisMaturityService)
     {
         _catalog = catalog;
         _signalService = signalService;
         _deepSeekAnalysisService = deepSeekAnalysisService;
+        _deepSeekAnalysisMaturityService = deepSeekAnalysisMaturityService;
     }
 
     [HttpGet]
@@ -34,6 +40,16 @@ public sealed class NewsController : ControllerBase
     {
         var result = await _deepSeekAnalysisService.AnalyzeAsync(request, cancellationToken);
         return Ok(result);
+    }
+
+    [HttpPost("deepseek/analyze/maturity")]
+    public async Task<ActionResult<DeepSeekAnalysisMaturityLayer>> AnalyzeDeepSeekMaturity(
+        [FromBody] DeepSeekAnalysisRequest request,
+        CancellationToken cancellationToken)
+    {
+        var analysis = await _deepSeekAnalysisService.AnalyzeAsync(request, cancellationToken);
+        var maturity = _deepSeekAnalysisMaturityService.BuildMaturityLayer(analysis, simulatorMode: string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY")));
+        return Ok(maturity);
     }
 
     [HttpGet("deepseek/analyze")]

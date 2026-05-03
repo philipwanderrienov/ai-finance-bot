@@ -613,33 +613,24 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\philip.wanderrienov\\.nuget\\packages\\": {},
-    "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
+    "/Users/philipwanderrienov/.nuget/packages/": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\philip.wanderrienov\\Music\\ai-finance-bot\\src\\Services\\NewsCollector.Api\\NewsCollector.Api.csproj",
+      "projectUniqueName": "/Users/philipwanderrienov/Documents/ai-finance-bot/src/Services/NewsCollector.Api/NewsCollector.Api.csproj",
       "projectName": "NewsCollector.Api",
-      "projectPath": "C:\\Users\\philip.wanderrienov\\Music\\ai-finance-bot\\src\\Services\\NewsCollector.Api\\NewsCollector.Api.csproj",
-      "packagesPath": "C:\\Users\\philip.wanderrienov\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\philip.wanderrienov\\Music\\ai-finance-bot\\src\\Services\\NewsCollector.Api\\obj\\",
+      "projectPath": "/Users/philipwanderrienov/Documents/ai-finance-bot/src/Services/NewsCollector.Api/NewsCollector.Api.csproj",
+      "packagesPath": "/Users/philipwanderrienov/.nuget/packages/",
+      "outputPath": "/Users/philipwanderrienov/Documents/ai-finance-bot/src/Services/NewsCollector.Api/obj/",
       "projectStyle": "PackageReference",
-      "fallbackFolders": [
-        "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
-      ],
       "configFilePaths": [
-        "C:\\Users\\philip.wanderrienov\\AppData\\Roaming\\NuGet\\NuGet.Config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        "/Users/philipwanderrienov/.nuget/NuGet/NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net10.0"
       ],
       "sources": {
-        "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
-        "C:\\Users\\philip.wanderrienov\\Documents\\Telerik-Blazor-9\\Telerik Package": {},
-        "C:\\Users\\philip.wanderrienov\\Documents\\Telerik-Blazor\\Package": {},
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
@@ -700,7 +691,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.202/PortableRuntimeIdentifierGraph.json",
+        "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/10.0.201/PortableRuntimeIdentifierGraph.json",
         "packagesToPrune": {
           "Microsoft.AspNetCore": "(,10.0.32767]",
           "Microsoft.AspNetCore.Antiforgery": "(,10.0.32767]",

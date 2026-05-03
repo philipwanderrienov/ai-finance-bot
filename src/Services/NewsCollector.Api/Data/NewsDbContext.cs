@@ -53,11 +53,7 @@ public sealed class NewsDbContext : DbContext
             entity.Property(x => x.SentimentScore).HasColumnName("sentiment_score");
             entity.Property(x => x.Keywords)
                 .HasColumnName("keywords")
-                .HasConversion(
-                    value => JsonSerializer.Serialize(value, (JsonSerializerOptions?)null),
-                    value => string.IsNullOrWhiteSpace(value)
-                        ? new List<string>()
-                        : JsonSerializer.Deserialize<List<string>>(value, (JsonSerializerOptions?)null) ?? new List<string>())
+                .HasColumnType("jsonb")
                 .Metadata.SetValueComparer(StringListComparer);
             entity.Property(x => x.RawPayload).HasColumnName("raw_payload").HasColumnType("jsonb");
             entity.Property(x => x.IngestedAt).HasColumnName("ingested_at");
@@ -180,11 +176,4 @@ public sealed class NewsSignalEntity
     public decimal SuggestedPrice { get; set; }
     public string Reason { get; set; } = string.Empty;
     public DateTimeOffset GeneratedAt { get; set; }
-}
-
-public enum SignalAction
-{
-    Buy = 0,
-    Sell = 1,
-    Hold = 2
 }

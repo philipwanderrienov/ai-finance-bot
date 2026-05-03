@@ -1,14 +1,20 @@
 using System.Text.Json.Serialization;
+using NpgsqlTypes;
 
 namespace NewsCollector.Api.Models;
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum NewsCategory
 {
+    [PgName("Geopolitics")]
     Geopolitics = 0,
+    [PgName("Gold")]
     Gold = 1,
+    [PgName("Crypto")]
     Crypto = 2,
+    [PgName("Viral")]
     Viral = 3,
+    [PgName("Market")]
     Market = 4
 }
 
@@ -29,3 +35,13 @@ public sealed record NewsSignal(
     decimal SuggestedPrice,
     string Reason,
     IReadOnlyCollection<NewsItem> SupportingNews);
+
+public enum SignalAction
+{
+    [PgName("Buy")]
+    Buy = 0,
+    [PgName("Sell")]
+    Sell = 1,
+    [PgName("Hold")]
+    Hold = 2
+}

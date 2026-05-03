@@ -12,11 +12,13 @@ public sealed class PolymarketNewsRepository : IPolymarketNewsRepository
     private const string SourceName = "Polymarket";
 
     private readonly NewsDbContext _dbContext;
+    private readonly ILogger<PolymarketNewsRepository> _logger;
     private readonly string _baseUrl;
 
-    public PolymarketNewsRepository(NewsDbContext dbContext)
+    public PolymarketNewsRepository(NewsDbContext dbContext, ILogger<PolymarketNewsRepository> logger)
     {
         _dbContext = dbContext;
+        _logger = logger;
         _baseUrl = BuildConfiguration().GetSection("ExternalApis:Polymarket")["BaseUrl"]
             ?? throw new InvalidOperationException("ExternalApis:Polymarket:BaseUrl is missing.");
     }
@@ -26,6 +28,11 @@ public sealed class PolymarketNewsRepository : IPolymarketNewsRepository
         var polymarketItems = items
             .Where(item => string.Equals(item.Source, SourceName, StringComparison.OrdinalIgnoreCase))
             .ToList();
+
+        _logger.LogInformation(
+            "Polymarket upsert received {TotalCount} total items and {PolymarketCount} Polymarket items.",
+            items.Count(),
+            polymarketItems.Count);
 
         if (polymarketItems.Count == 0)
         {
@@ -55,17 +62,21 @@ public sealed class PolymarketNewsRepository : IPolymarketNewsRepository
             StringComparer.OrdinalIgnoreCase);
 
         var inserted = 0;
+        var skippedByUrl = 0;
+        var skippedBySignature = 0;
 
         foreach (var item in polymarketItems)
         {
             if (!string.IsNullOrWhiteSpace(item.Url) && existingUrls.Contains(item.Url))
             {
+                skippedByUrl++;
                 continue;
             }
 
             var signature = BuildSignature(item.Title, item.Summary);
             if (existingSignatures.Contains(signature))
             {
+                skippedBySignature++;
                 continue;
             }
 
@@ -81,7 +92,7 @@ public sealed class PolymarketNewsRepository : IPolymarketNewsRepository
                 PublishedAt = item.PublishedAt,
                 Category = item.Category,
                 SentimentScore = item.SentimentScore,
-                Keywords = item.Keywords?.ToList(),
+                Keywords = null,
                 RawPayload = JsonSerializer.Serialize(item),
                 IngestedAt = DateTimeOffset.UtcNow,
                 UpdatedAt = DateTimeOffset.UtcNow
@@ -96,12 +107,26 @@ public sealed class PolymarketNewsRepository : IPolymarketNewsRepository
             inserted++;
         }
 
+        _logger.LogInformation(
+            "Polymarket upsert prepared {InsertedCount} inserts, skipped {SkippedByUrl} by URL and {SkippedBySignature} by signature.",
+            inserted,
+            skippedByUrl,
+            skippedBySignature);
+
         if (inserted == 0)
         {
             return 0;
         }
 
-        return await _dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            return await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "Polymarket upsert failed while saving {InsertedCount} pending articles.", inserted);
+            throw;
+        }
     }
 
     private async Task EnsureSourceAsync(CancellationToken cancellationToken)

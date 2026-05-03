@@ -51,11 +51,11 @@ public sealed class AnalysisCandidateBuilder : IAnalysisCandidateBuilder
             command.CommandText = """
                 SELECT id, source_name, title, summary, url, published_at, sentiment_score, keywords
                 FROM news_articles
-                WHERE category::text = @category
+                WHERE category::text ILIKE @category
                 ORDER BY published_at DESC
                 LIMIT @limit
                 """;
-            command.Parameters.Add(new NpgsqlParameter("category", request.Category.ToString().ToLowerInvariant()));
+            command.Parameters.Add(new NpgsqlParameter("category", request.Category.ToString()));
             command.Parameters.Add(new NpgsqlParameter("limit", lookbackCount * 3));
 
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);

@@ -20,6 +20,7 @@ public sealed class DeepSeekOptions
 
 public sealed class NewsRefreshSchedulerOptions
 {
+    public bool Enabled { get; set; } = false;
     public int InitialDelaySeconds { get; set; } = 0;
     public int IntervalMinutes { get; set; } = 1;
 }
