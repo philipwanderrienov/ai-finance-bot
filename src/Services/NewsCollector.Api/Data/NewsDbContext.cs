@@ -95,22 +95,24 @@ public sealed class NewsDbContext : DbContext
             entity.Property(x => x.Reason).HasColumnName("reason").IsRequired();
             entity.Property(x => x.KeyPoints)
                 .HasColumnName("key_points")
+                .HasColumnType("jsonb")
                 .HasConversion(
-                    value => SerializeStringList(value),
-                    value => DeserializeStringList(value))
+                    value => JsonDocument.Parse(SerializeStringList(value)),
+                    value => DeserializeStringList(value.RootElement.GetRawText()))
                 .Metadata.SetValueComparer(StringListComparer);
             entity.Property(x => x.RiskFactors)
                 .HasColumnName("risk_factors")
+                .HasColumnType("jsonb")
                 .HasConversion(
-                    value => SerializeStringList(value),
-                    value => DeserializeStringList(value))
+                    value => JsonDocument.Parse(SerializeStringList(value)),
+                    value => DeserializeStringList(value.RootElement.GetRawText()))
                 .Metadata.SetValueComparer(StringListComparer);
             entity.Property(x => x.SourceUrls)
                 .HasColumnName("source_urls")
                 .HasColumnType("jsonb")
                 .HasConversion(
-                    value => SerializeStringList(value),
-                    value => DeserializeStringList(value))
+                    value => JsonDocument.Parse(SerializeStringList(value)),
+                    value => DeserializeStringList(value.RootElement.GetRawText()))
                 .Metadata.SetValueComparer(StringListComparer);
             entity.Property(x => x.GeneratedAt).HasColumnName("generated_at");
             entity.Property(x => x.Prompt).HasColumnName("prompt");

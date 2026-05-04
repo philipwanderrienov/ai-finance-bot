@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using NewsCollector.Api.Data;
 using NewsCollector.Api.Models;
+using NewsCollector.Api.Services.DeepSeekAnalysisService.Persistence;
 
 namespace NewsCollector.Api.Services.DeepSeekAnalysisService;
 
@@ -21,17 +22,20 @@ public sealed class DeepSeekAnalysisService : IDeepSeekAnalysisService
     private readonly DeepSeekOptions _options;
     private readonly IAnalysisCandidateBuilder _candidateBuilder;
     private readonly IAnalysisFingerprintService _fingerprintService;
+    private readonly IDeepSeekAnalysisPersistenceService _persistenceService;
 
     public DeepSeekAnalysisService(
         NewsDbContext dbContext,
         IOptions<DeepSeekOptions> options,
         IAnalysisCandidateBuilder candidateBuilder,
-        IAnalysisFingerprintService fingerprintService)
+        IAnalysisFingerprintService fingerprintService,
+        IDeepSeekAnalysisPersistenceService persistenceService)
     {
         _dbContext = dbContext;
         _options = options.Value;
         _candidateBuilder = candidateBuilder;
         _fingerprintService = fingerprintService;
+        _persistenceService = persistenceService;
     }
 
     public async Task<DeepSeekAnalysisResult> AnalyzeAsync(DeepSeekAnalysisRequest request, CancellationToken cancellationToken)
@@ -50,7 +54,7 @@ public sealed class DeepSeekAnalysisService : IDeepSeekAnalysisService
         var gap = Math.Round(analysis.Confidence - marketPrice, 4, MidpointRounding.AwayFromZero);
         var signal = ResolveDivergenceSignal(analysis.Confidence, marketPrice);
 
-        return new DeepSeekAnalysisResult(
+        var result = new DeepSeekAnalysisResult(
             Guid.NewGuid(),
             request.Category,
             request.Symbol,
@@ -67,6 +71,15 @@ public sealed class DeepSeekAnalysisService : IDeepSeekAnalysisService
             analysis.RiskFactors.ToArray(),
             candidates.Select(x => x.Url).Where(url => !string.IsNullOrWhiteSpace(url)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
             DateTimeOffset.UtcNow);
+
+        await _persistenceService.PersistAsync(
+            result,
+            result.KeyPoints.ToArray(),
+            result.RiskFactors.ToArray(),
+            result.SourceUrls.ToArray(),
+            cancellationToken);
+
+        return result;
     }
 
     public async Task<IReadOnlyList<DeepSeekAnalysisResult>> GetLatestAsync(NewsCategory category, string symbol, int take, CancellationToken cancellationToken)

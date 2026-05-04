@@ -24,6 +24,21 @@ public sealed record DeepSeekAnalysisResult(
     IReadOnlyCollection<string> SourceUrls,
     DateTimeOffset GeneratedAt);
 
+public sealed record DeepSeekAnalysisAuditPayload(
+    DeepSeekAnalysisResult Result,
+    DeepSeekAnalysisMaturityLayer? Maturity,
+    IReadOnlyCollection<DeepSeekAnalysisOutcome> FutureOutcomes,
+    IReadOnlyDictionary<string, object?>? AnalysisPayload);
+
+public sealed record DeepSeekAnalysisOutcome(
+    string Window,
+    decimal ActualMovePct,
+    decimal ActualReturnBps,
+    decimal Accuracy,
+    decimal DrawdownBps,
+    string OutcomeLabel,
+    DateTimeOffset EvaluatedAtUtc);
+
 public sealed class DeepSeekAnalysisEntity
 {
     public Guid Id { get; set; }
@@ -40,6 +55,8 @@ public sealed class DeepSeekAnalysisEntity
     public DateTimeOffset GeneratedAt { get; set; }
     public string? Prompt { get; set; }
     public string? RawResponse { get; set; }
+    public string? MaturityPayloadJson { get; set; }
+    public string? BacktestHistoryJson { get; set; }
     public string InputFingerprint { get; set; } = string.Empty;
     public int InputArticleCount { get; set; }
 }

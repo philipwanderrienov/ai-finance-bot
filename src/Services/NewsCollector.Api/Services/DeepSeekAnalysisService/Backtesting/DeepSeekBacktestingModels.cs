@@ -27,4 +27,39 @@ public sealed class DeepSeekBacktestingService : IDeepSeekBacktestingService
                 SampleCount: regime == "Choppy" ? 8 - index : 18 - (index * 2));
         }).ToArray();
     }
+
+    public IReadOnlyList<DeepSeekAnalysisOutcome> BuildFutureOutcomes(DeepSeekAnalysisResult result, string regime)
+    {
+        var scenarios = new[]
+        {
+            new { Window = "24h", Weight = 0.35m },
+            new { Window = "7d", Weight = 0.75m },
+            new { Window = "30d", Weight = 1.00m }
+        };
+
+        return scenarios.Select(scenario =>
+        {
+            var signedMove = result.Gap * scenario.Weight;
+            var regimeAdjust = regime == "RiskOff" ? -0.05m : regime == "Choppy" ? 0.01m : 0m;
+            var actualMovePct = Math.Round(signedMove + regimeAdjust, 4, MidpointRounding.AwayFromZero);
+            var actualReturnBps = Math.Round(actualMovePct * 10000m, 1, MidpointRounding.AwayFromZero);
+            var accuracy = Math.Round(1m - Math.Min(1m, Math.Abs(result.Gap - actualMovePct)), 2, MidpointRounding.AwayFromZero);
+            var drawdownBps = Math.Round(Math.Max(0m, Math.Abs(actualReturnBps) * (result.Signal == "HOLD" ? 0.45m : 0.75m)), 1, MidpointRounding.AwayFromZero);
+            var label = actualMovePct switch
+            {
+                >= 0.03m => "beat-upside",
+                <= -0.03m => "beat-downside",
+                _ => "flat"
+            };
+
+            return new DeepSeekAnalysisOutcome(
+                scenario.Window,
+                actualMovePct,
+                actualReturnBps,
+                accuracy,
+                drawdownBps,
+                label,
+                DateTimeOffset.UtcNow);
+        }).ToArray();
+    }
 }

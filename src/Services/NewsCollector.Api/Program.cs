@@ -13,6 +13,7 @@ using NewsCollector.Api.Services.DeepSeekAnalysisService.Explainability;
 using NewsCollector.Api.Services.DeepSeekAnalysisService.RegimeAwareness;
 using NewsCollector.Api.Services.DeepSeekAnalysisService.RiskManagement;
 using NewsCollector.Api.Services.DeepSeekAnalysisService.SourceWeighting;
+using NewsCollector.Api.Services.DeepSeekAnalysisService.Reporting;
 using NewsCollector.Api.Services.NewsSignalService;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -56,12 +57,14 @@ builder.Services.AddScoped<IPolymarketNewsRepository, PolymarketNewsRepository>(
 builder.Services.AddScoped<IAnalysisCandidateBuilder, AnalysisCandidateBuilder>();
 builder.Services.AddSingleton<IAnalysisFingerprintService, AnalysisFingerprintService>();
 builder.Services.AddScoped<IDeepSeekAnalysisService, DeepSeekAnalysisService>();
+builder.Services.AddScoped<NewsCollector.Api.Services.DeepSeekAnalysisService.Persistence.IDeepSeekAnalysisPersistenceService, NewsCollector.Api.Services.DeepSeekAnalysisService.Persistence.DeepSeekAnalysisPersistenceService>();
 builder.Services.AddScoped<IDeepSeekRegimeAwarenessService, DeepSeekRegimeAwarenessService>();
 builder.Services.AddScoped<IDeepSeekSourceWeightingService, DeepSeekSourceWeightingService>();
 builder.Services.AddScoped<IDeepSeekBacktestingService, DeepSeekBacktestingService>();
 builder.Services.AddScoped<IDeepSeekRiskManagementService, DeepSeekRiskManagementService>();
 builder.Services.AddScoped<IDeepSeekExplainabilityService, DeepSeekExplainabilityService>();
 builder.Services.AddScoped<IDeepSeekAnalysisMaturityService, DeepSeekAnalysisMaturityService>();
+builder.Services.AddScoped<IDeepSeekAnalysisReportingService, DeepSeekAnalysisReportingService>();
 builder.Services.AddHostedService<NewsRefreshWorker>();
 
 var app = builder.Build();
