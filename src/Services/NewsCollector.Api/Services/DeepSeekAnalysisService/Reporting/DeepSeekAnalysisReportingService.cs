@@ -5,11 +5,6 @@ using NewsCollector.Api.Models;
 
 namespace NewsCollector.Api.Services.DeepSeekAnalysisService.Reporting;
 
-public interface IDeepSeekAnalysisReportingService
-{
-    Task<DeepSeekAnalysisPerformanceReport> BuildAsync(NewsCategory? category, string? symbol, CancellationToken cancellationToken);
-}
-
 public sealed class DeepSeekAnalysisReportingService : IDeepSeekAnalysisReportingService
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -39,9 +34,18 @@ public sealed class DeepSeekAnalysisReportingService : IDeepSeekAnalysisReportin
         }
 
         var rows = await query
-            .OrderByDescending(x => x.GeneratedAt)
+            .Select(x => new
+            {
+                x.Confidence,
+                x.MaturityPayloadJson,
+                x.GeneratedAt
+            })
             .Take(500)
             .ToListAsync(cancellationToken);
+
+        rows = rows
+            .OrderByDescending(x => x.GeneratedAt)
+            .ToList();
 
         var analyses = rows.Count;
         var withMaturity = 0;

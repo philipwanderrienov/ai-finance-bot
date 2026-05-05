@@ -1,0 +1,30 @@
+NewsCollector.Api test script
+
+Prerequisites:
+- .NET SDK 10 installed
+- You are in the repository root
+
+Quick validation:
+1. Build the solution
+   dotnet build NewsCollector.sln -c Debug
+
+2. Run all tests
+   dotnet test src/Tests/NewsCollector.Api.Tests/NewsCollector.Api.Tests.csproj -c Debug
+
+3. Run only the reporting tests
+   dotnet test src/Tests/NewsCollector.Api.Tests/NewsCollector.Api.Tests.csproj -c Debug --filter DeepSeekAnalysisReportingServiceTests
+
+Manual API test:
+1. Start the API
+   dotnet run --project src/Services/NewsCollector.Api/NewsCollector.Api.csproj
+
+2. Call the report endpoint
+   curl "http://localhost:5000/api/news/deepseek/report"
+
+3. Call the filtered report endpoint
+   curl "http://localhost:5000/api/news/deepseek/report?category=Crypto&symbol=BTC"
+
+Expected results:
+- Build succeeds
+- Test suite passes
+- Report endpoint returns HTTP 200 with a performance summary payload

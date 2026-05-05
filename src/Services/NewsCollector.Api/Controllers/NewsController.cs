@@ -3,6 +3,7 @@ using NewsCollector.Api.Models;
 using NewsCollector.Api.Services;
 using NewsCollector.Api.Services.DeepSeekAnalysisService;
 using NewsCollector.Api.Services.DeepSeekAnalysisService.Backtesting;
+using NewsCollector.Api.Services.DeepSeekAnalysisService.Maturity;
 using NewsCollector.Api.Services.DeepSeekAnalysisService.Persistence;
 using NewsCollector.Api.Services.DeepSeekAnalysisService.Reporting;
 using NewsCollector.Api.Services.NewsSignalService;

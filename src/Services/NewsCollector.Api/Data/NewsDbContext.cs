@@ -5,7 +5,7 @@ using NewsCollector.Api.Models;
 
 namespace NewsCollector.Api.Data;
 
-public sealed class NewsDbContext : DbContext
+public class NewsDbContext : DbContext
 {
     public NewsDbContext(DbContextOptions<NewsDbContext> options)
         : base(options)
@@ -117,6 +117,8 @@ public sealed class NewsDbContext : DbContext
             entity.Property(x => x.GeneratedAt).HasColumnName("generated_at");
             entity.Property(x => x.Prompt).HasColumnName("prompt");
             entity.Property(x => x.RawResponse).HasColumnName("raw_response");
+            entity.Property(x => x.MaturityPayloadJson).HasColumnName("maturity_payload_json");
+            entity.Property(x => x.BacktestHistoryJson).HasColumnName("backtest_history_json");
             entity.Property(x => x.InputFingerprint).HasColumnName("input_fingerprint").IsRequired();
             entity.Property(x => x.InputArticleCount).HasColumnName("input_article_count");
             entity.HasIndex(x => new { x.Category, x.Symbol, x.GeneratedAt });

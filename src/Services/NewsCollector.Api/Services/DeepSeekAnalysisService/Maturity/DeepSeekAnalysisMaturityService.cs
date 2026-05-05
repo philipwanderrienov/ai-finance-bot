@@ -1,16 +1,12 @@
 using NewsCollector.Api.Models;
 using NewsCollector.Api.Services.DeepSeekAnalysisService.Backtesting;
 using NewsCollector.Api.Services.DeepSeekAnalysisService.Explainability;
+using NewsCollector.Api.Services.DeepSeekAnalysisService.Maturity;
 using NewsCollector.Api.Services.DeepSeekAnalysisService.RegimeAwareness;
 using NewsCollector.Api.Services.DeepSeekAnalysisService.RiskManagement;
 using NewsCollector.Api.Services.DeepSeekAnalysisService.SourceWeighting;
 
 namespace NewsCollector.Api.Services.DeepSeekAnalysisService;
-
-public interface IDeepSeekAnalysisMaturityService
-{
-    DeepSeekAnalysisMaturityLayer BuildMaturityLayer(DeepSeekAnalysisResult result, bool simulatorMode, string? modelName = null);
-}
 
 public sealed class DeepSeekAnalysisMaturityService : IDeepSeekAnalysisMaturityService
 {

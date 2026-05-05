@@ -13,6 +13,7 @@ using NewsCollector.Api.Services.DeepSeekAnalysisService.Explainability;
 using NewsCollector.Api.Services.DeepSeekAnalysisService.RegimeAwareness;
 using NewsCollector.Api.Services.DeepSeekAnalysisService.RiskManagement;
 using NewsCollector.Api.Services.DeepSeekAnalysisService.SourceWeighting;
+using NewsCollector.Api.Services.DeepSeekAnalysisService.Maturity;
 using NewsCollector.Api.Services.DeepSeekAnalysisService.Reporting;
 using NewsCollector.Api.Services.NewsSignalService;
 
