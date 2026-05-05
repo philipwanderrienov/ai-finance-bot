@@ -53,7 +53,7 @@ builder.Services.AddDbContext<NewsDbContext>(options =>
         }));
 
 builder.Services.AddSingleton<INewsCatalog, InMemoryNewsCatalog>();
-builder.Services.AddSingleton<INewsSignalService, NewsSignalService>();
+builder.Services.AddScoped<INewsSignalService, NewsSignalService>();
 builder.Services.AddScoped<IPolymarketNewsRepository, PolymarketNewsRepository>();
 builder.Services.AddScoped<IAnalysisCandidateBuilder, AnalysisCandidateBuilder>();
 builder.Services.AddSingleton<IAnalysisFingerprintService, AnalysisFingerprintService>();

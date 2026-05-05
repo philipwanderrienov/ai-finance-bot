@@ -45,8 +45,11 @@ public sealed class NewsController : ControllerBase
         => Ok(_catalog.GetLatest());
 
     [HttpGet("signals")]
-    public ActionResult<IReadOnlyCollection<NewsSignal>> GetSignals()
-        => Ok(_signalService.Analyze(_catalog.GetLatest()).ToArray());
+    public async Task<ActionResult<IReadOnlyCollection<NewsSignal>>> GetSignals(CancellationToken cancellationToken)
+    {
+        var signals = await _signalService.AnalyzeAndPersistAsync(_catalog.GetLatest(), cancellationToken);
+        return Ok(signals);
+    }
 
     [HttpPost("deepseek/analyze")]
     public async Task<ActionResult<DeepSeekAnalysisResult>> AnalyzeDeepSeek([FromBody] DeepSeekAnalysisRequest request, CancellationToken cancellationToken)

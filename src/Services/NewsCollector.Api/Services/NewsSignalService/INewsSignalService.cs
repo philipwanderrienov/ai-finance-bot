@@ -4,5 +4,7 @@ namespace NewsCollector.Api.Services.NewsSignalService;
 
 public interface INewsSignalService
 {
-    IEnumerable<NewsSignal> Analyze(IEnumerable<NewsItem> items);
+    IReadOnlyCollection<NewsSignal> Analyze(IEnumerable<NewsItem> items);
+
+    Task<IReadOnlyCollection<NewsSignal>> AnalyzeAndPersistAsync(IEnumerable<NewsItem> items, CancellationToken cancellationToken);
 }
