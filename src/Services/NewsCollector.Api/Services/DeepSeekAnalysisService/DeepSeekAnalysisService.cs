@@ -123,18 +123,36 @@ public sealed class DeepSeekAnalysisService : IDeepSeekAnalysisService
         requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
         requestMessage.Content = new StringContent(JsonSerializer.Serialize(requestBody, JsonOptions), Encoding.UTF8, "application/json");
 
-        using var response = await HttpClient.SendAsync(requestMessage, cancellationToken);
-        var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
-        response.EnsureSuccessStatusCode();
-
-        var content = ExtractAssistantContent(responseText);
-        if (string.IsNullOrWhiteSpace(content))
+        try
         {
-            throw new InvalidOperationException("DeepSeek returned an empty response.");
-        }
+            using var response = await HttpClient.SendAsync(requestMessage, cancellationToken);
+            var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
 
-        var payload = ParsePayload(content);
-        return payload with { RawResponse = responseText };
+            // If DeepSeek is unavailable due to billing/auth/rate limits/endpoint mismatch,
+            // fall back to simulator so callers don't fail the whole pipeline.
+            if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized
+                or System.Net.HttpStatusCode.Forbidden
+                or System.Net.HttpStatusCode.PaymentRequired
+                or System.Net.HttpStatusCode.NotFound)
+            {
+                return BuildSimulatorPayload(request, candidates, prompt);
+            }
+
+            response.EnsureSuccessStatusCode();
+
+            var content = ExtractAssistantContent(responseText);
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                throw new InvalidOperationException("DeepSeek returned an empty response.");
+            }
+
+            var payload = ParsePayload(content);
+            return payload with { RawResponse = responseText };
+        }
+        catch (HttpRequestException)
+        {
+            return BuildSimulatorPayload(request, candidates, prompt);
+        }
     }
 
     private static DeepSeekAnalysisPayload BuildSimulatorPayload(
@@ -176,7 +194,7 @@ public sealed class DeepSeekAnalysisService : IDeepSeekAnalysisService
         };
 
         var summary = $"DeepSeek simulator produced a {summaryTone} read on {request.Category} ({request.Symbol}) from {candidates.Count} Polymarket articles.";
-        var reason = $"Offline simulator used because DeepSeek API key is not configured. Average sentiment={averageSentiment:0.00}, positiveSignals={positiveSignals}, negativeSignals={negativeSignals}, momentum={momentum:0.00}.";
+        var reason = $"Offline simulator used because DeepSeek request could not be executed. Average sentiment={averageSentiment:0.00}, positiveSignals={positiveSignals}, negativeSignals={negativeSignals}, momentum={momentum:0.00}.";
         var keyPoints = topCandidates
             .Select(candidate => $"{candidate.PublishedAt:yyyy-MM-dd}: {candidate.Title}")
             .Distinct()
@@ -203,7 +221,7 @@ public sealed class DeepSeekAnalysisService : IDeepSeekAnalysisService
     {
         var riskFactors = new List<string>
         {
-            $"No DeepSeek API key configured; using simulator for {request.Category}/{request.Symbol}.",
+            $"DeepSeek request could not be executed; using simulator for {request.Category}/{request.Symbol}.",
             $"Average sentiment score is {averageSentiment:0.00}."
         };
 
