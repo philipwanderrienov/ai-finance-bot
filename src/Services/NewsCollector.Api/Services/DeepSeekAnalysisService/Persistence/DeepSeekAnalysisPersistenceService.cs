@@ -24,11 +24,12 @@ public sealed class DeepSeekAnalysisPersistenceService : IDeepSeekAnalysisPersis
         IReadOnlyList<string> keyPoints,
         IReadOnlyList<string> riskFactors,
         IReadOnlyList<string> sourceUrls,
+        string inputFingerprint,
+        int inputArticleCount,
         CancellationToken cancellationToken)
     {
-        var fingerprint = BuildFingerprint(result);
         var existing = await _dbContext.DeepSeekAnalyses
-            .FirstOrDefaultAsync(x => x.Category == result.Category && x.Symbol == result.Symbol && x.InputFingerprint == fingerprint, cancellationToken);
+            .FirstOrDefaultAsync(x => x.Category == result.Category && x.Symbol == result.Symbol && x.InputFingerprint == inputFingerprint, cancellationToken);
 
         if (existing is not null)
         {
@@ -51,8 +52,8 @@ public sealed class DeepSeekAnalysisPersistenceService : IDeepSeekAnalysisPersis
             GeneratedAt = result.GeneratedAt,
             Prompt = BuildPrompt(result),
             RawResponse = JsonSerializer.Serialize(result, JsonOptions),
-            InputFingerprint = fingerprint,
-            InputArticleCount = sourceUrls.Count
+            InputFingerprint = inputFingerprint,
+            InputArticleCount = inputArticleCount
         });
 
         await _dbContext.SaveChangesAsync(cancellationToken);

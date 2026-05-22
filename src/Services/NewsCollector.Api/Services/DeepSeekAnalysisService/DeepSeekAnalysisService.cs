@@ -47,6 +47,23 @@ public sealed class DeepSeekAnalysisService : IDeepSeekAnalysisService
             throw new InvalidOperationException($"No articles found for category {request.Category}.");
         }
 
+        // Compute a stable fingerprint from the *input article set* and short-circuit
+        // if we already persisted an analysis for the same input. This prevents
+        // repeated DeepSeek calls (token spend) for identical inputs.
+        var inputArticleCount = candidates.Count;
+        var inputFingerprint = _fingerprintService.CreateFingerprint(request.Category, request.Symbol, candidates);
+
+        var existing = await _dbContext.DeepSeekAnalyses
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                x => x.Category == request.Category && x.Symbol == request.Symbol && x.InputFingerprint == inputFingerprint,
+                cancellationToken);
+
+        if (existing is not null)
+        {
+            return Map(existing);
+        }
+
         var prompt = BuildPrompt(request, candidates);
         var analysis = await RequestDeepSeekAsync(request, candidates, prompt, cancellationToken);
 
@@ -72,11 +89,15 @@ public sealed class DeepSeekAnalysisService : IDeepSeekAnalysisService
             candidates.Select(x => x.Url).Where(url => !string.IsNullOrWhiteSpace(url)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
             DateTimeOffset.UtcNow);
 
+        // fingerprint + article count computed above (used for persistence + dedupe)
+
         await _persistenceService.PersistAsync(
             result,
             result.KeyPoints.ToArray(),
             result.RiskFactors.ToArray(),
             result.SourceUrls.ToArray(),
+            inputFingerprint,
+            inputArticleCount,
             cancellationToken);
 
         return result;

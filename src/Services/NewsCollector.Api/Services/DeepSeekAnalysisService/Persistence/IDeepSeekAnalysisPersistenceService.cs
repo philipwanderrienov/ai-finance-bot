@@ -9,6 +9,8 @@ public interface IDeepSeekAnalysisPersistenceService
         IReadOnlyList<string> keyPoints,
         IReadOnlyList<string> riskFactors,
         IReadOnlyList<string> sourceUrls,
+        string inputFingerprint,
+        int inputArticleCount,
         CancellationToken cancellationToken);
 
     Task StoreMaturityAsync(
